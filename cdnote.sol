@@ -30,6 +30,7 @@ contract CDNote {
     uint256 public maxBorrow;
     uint256 public loanTimeLimit;
     uint256 public minDeposit;
+    uint256 public contractEarn;
     bool public godSwitch; // protocol shutdown
     
 modifier onlyDAO() {
@@ -121,6 +122,7 @@ function depositEth(uint256 _days) payable public {
     cdTracker[msg.sender] = noteNumber;
     emit newCD (cd[noteNumber]);
     noteNumber = noteNumber +1;
+    contractEarn = contractEarn + _fee;
 } 
 
 //Withdrawl of Matured CD Note @ end of timeLock
@@ -156,6 +158,7 @@ function earlyWithdrawl (uint256 _noteNumber) payable public {
     cd[_noteNumber].maturedValue = 0;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
     emit earlyWithdrawlCD(cd[_noteNumber]);
+    contractEarn = contractEarn + cd[_noteNumber].earlyBorrowWithdrawlFee;
 } 
 function borrowWithdrawl(uint256 _noteNumber, uint256 _value) payable public {
     require(godSwitch == false, "protocol shutdown");
@@ -170,6 +173,7 @@ function borrowWithdrawl(uint256 _noteNumber, uint256 _value) payable public {
     _ethreceiver.transfer(_value);
     cd[_noteNumber].valid = false;
     emit borrowCD(cd[_noteNumber]);
+    contractEarn = contractEarn + cd[_noteNumber].earlyBorrowWithdrawlFee;
 }
 function payLoanCD(uint256 _noteNumber)payable public{
     require(godSwitch == false, "protocol shutdown");
@@ -190,6 +194,7 @@ function liquidCD(uint256 _noteNumber)public {
     cd[_noteNumber].liquidated = true;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
     emit liquidateCD(cd[_noteNumber], msg.sender);
+    contractEarn = contractEarn + (cd[_noteNumber].ethBalance - cd[_noteNumber].loanPay) ;
 }
 function calcFee(uint256 _value, uint256 _fee) pure public returns(uint256){
     uint256 feeCalc = _value * _fee / 10000 ; 
@@ -206,7 +211,7 @@ function rateCalc(uint256 _days) view public returns(uint256){
 function transferCD(uint256 _noteNumber, address _newAddress) public {
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
-    require(cd[_noteNumber].loanBlockDue >= block.number, "Block Time Limit is Expired");
+    require(cd[_noteNumber].loanBlockDue < block.number, "Block Time Limit is Expired");
     require(cd[_noteNumber].valid == true,  "Not a valid cd, loaned or cleared");
     emit transferAddress(cd[noteNumber],_newAddress);
     cdTracker[cd[_noteNumber].accountAddress] = 0;
