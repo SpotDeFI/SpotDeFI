@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity >=0.7.0 <0.9.0;
@@ -208,6 +209,7 @@ function liquidCD(uint256 _noteNumber)public {
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].valid == false , "CD not loaned");
     require(cd[_noteNumber].loanBlockDue <= block.number||cd[_noteNumber].timeLock <= block.number, "CD Matured while under Loan");
+    require(cd[_noteNumber].accountAddress != 0x0000000000000000000000000000000000000000, 'Not a valid CD');
     cd[_noteNumber].valid = false;
     cd[_noteNumber].liquidated = true;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
@@ -255,4 +257,5 @@ function addFunds(uint256 _noteNumber)payable  public{
     emit fundsAdd(cd[_noteNumber]);
     
     
+}
 }
