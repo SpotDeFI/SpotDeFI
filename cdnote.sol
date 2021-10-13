@@ -167,7 +167,7 @@ function borrowWithdrawl(uint256 _noteNumber, uint256 _value) payable public {
     require((cd[_noteNumber].ethBalance - cd[_noteNumber].earlyBorrowWithdrawlFee )/ maxBorrow >= _value, "Over Borrow Limit");
     address _accountAddress = cd[_noteNumber].accountAddress;
     address payable _ethreceiver = payable(_accountAddress);
-    cd[_noteNumber].ethBalance = cd[_noteNumber].ethBalance - cd[_noteNumber].earlyBorrowWithdrawlFee; 
+    cd[_noteNumber].ethBalance = cd[_noteNumber].ethBalance - cd[_noteNumber].earlyBorrowWithdrawlFee - _value;
     cd[_noteNumber].loanBlockDue = block.number + (loanTimeLimit * blocksPerDay);
     cd[_noteNumber].loanPay = _value; 
     _ethreceiver.transfer(_value);
@@ -181,6 +181,7 @@ function payLoanCD(uint256 _noteNumber)payable public{
     require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
     require(cd[_noteNumber].loanBlockDue >= block.number, "Block Time Limit is Expired");
     require(msg.value >= cd[_noteNumber].loanPay, "More Value required" );
+    cd[_noteNumber].ethBalance = cd[_noteNumber].ethBalance + cd[_noteNumber].loanPay;
     cd[_noteNumber].loanPay = 0;
     cd[_noteNumber].loanBlockDue = 0;
     cd[_noteNumber].valid = true;
@@ -194,6 +195,10 @@ function liquidCD(uint256 _noteNumber)public {
     cd[_noteNumber].liquidated = true;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
     emit liquidateCD(cd[_noteNumber], msg.sender);
+    cd[_noteNumber].loanPay = 0;
+    cd[_noteNumber].loanBlockDue = 0;
+    cd[_noteNumber].ethBalance = 0;
+    cd[_noteNumber].maturedValue = 0;
     contractEarn = contractEarn + (cd[_noteNumber].ethBalance - cd[_noteNumber].loanPay) ;
 }
 function calcFee(uint256 _value, uint256 _fee) pure public returns(uint256){
