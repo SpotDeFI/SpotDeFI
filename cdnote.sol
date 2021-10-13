@@ -18,66 +18,77 @@ contract CDNote {
     earlyBorrowWithdrawlFee = 50; // 10,000 = 100%
     minDeposit = 10000000000000; // 10,000 gwei min deposi
 }
-    address public DAO;
-    address payable public contractAddress;
-    uint256 public noteNumber;
-    uint256 public fee;
-    uint256 public earlyBorrowWithdrawlFee;
-    uint256 public timeLockMin;
-    uint256 public timeLockMax;
-    uint256 public rateMax;
-    uint256 public blocksPerDay;
-    uint256 public maxBorrow;
-    uint256 public loanTimeLimit;
-    uint256 public minDeposit;
-    uint256 public contractEarn;
+    address public DAO; //Dao contract address to make governance calls 
+    address payable public contractAddress; // THIS addres
+    uint256 public noteNumber; //Number for notes 
+    uint256 public fee; //CD creation fee % of deposit 10000 = 100%
+    uint256 public earlyBorrowWithdrawlFee; //fee for early withdrawl or borrow of funds % of deposit 10000 = 100%
+    uint256 public timeLockMin; //Min time days to lock funds for a matured CD Note
+    uint256 public timeLockMax; //Max time days to lock funds for a matured CD Note
+    uint256 public rateMax; //Max % rate earned on Max time locked investment 10000 = 100%
+    uint256 public blocksPerDay; //5760 blocks per day used for timelock calc for determination of maturity block
+    uint256 public maxBorrow; //sets max amount that can be borrowed against cd (1/2 initial #) of Eth Balance
+    uint256 public loanTimeLimit; //set days to pay back loan against CD and expires CD if blocks go past due block
+    uint256 public minDeposit;// sets a min Deposit ammount 10,000 gwei initial amount 
+    uint256 public contractEarn; //how much the contract has earned off fees and liquidation
     bool public godSwitch; // protocol shutdown
-    
+
+//sets control limis on functions to only the DAO address    
 modifier onlyDAO() {
     require(msg.sender == DAO, "Caller is not DAO Contract");
     _;
 }
+//Changes blocks per day should only be changed if major network change makes less or more blocks in a day
 function changeBlkPerDay(uint256 _blocksPerDay) onlyDAO public {
     blocksPerDay = _blocksPerDay;
 }
+//Changes the fee for creating a CD
 function changeFee(uint256 _fee) onlyDAO public {
     require(_fee <= 10000, '10,000 is 100%');
     fee = _fee;
 }
+//Changes the fee for early withdrawl and and borrowing 
 function changeEarlyWithdrawlFee(uint256 _earlyBorrowWithdrawlFee) onlyDAO public {
     require(_earlyBorrowWithdrawlFee <= 10000, '10,000 is 100%');
     earlyBorrowWithdrawlFee = _earlyBorrowWithdrawlFee;
 }
+//Changes DOA Address
 function changeOwner(address _DAO) onlyDAO public {
     DAO = _DAO;
 }
+//Changes Max % interest rate 
 function changeRateMax(uint256 _rateMax) onlyDAO public {
     require(_rateMax <= 10000, '10,000 is 100%');
     rateMax = _rateMax;
 }
+//Changes Max Days of Time Lock
 function changeTimeLockMax(uint256 _timeLockMax) onlyDAO public {
     require(_timeLockMax > timeLockMin);
     timeLockMax = _timeLockMax;
 }
+//Changes Min Days of Time Lock
 function changeTimeLockMin(uint256 _timeLockMin) onlyDAO public {
     require(_timeLockMin < timeLockMax);
     timeLockMin = _timeLockMin;
 }
+// Calls Contract Balance
 function contractBalance () view public returns(uint256){
 return(address(this).balance);
 }
-
+// Calls Current Block
 function currentBlock () view public returns(uint256){
 return(block.number);
 }
+// Shuts off Protocol
 function setGodSwitchON() onlyDAO public {
     godSwitch = true;
 }
+// Turns on Protocol 
 function setGodSwitchOFF() onlyDAO public {
     godSwitch = false;
 }
 
-
+// all info for a created CD
 struct depositNote   {
     uint256 noteNumber; //Note Number
     address accountAddress; //Account Address
@@ -94,10 +105,12 @@ struct depositNote   {
     bool liquidated;
 }
 
+//mapping of the created CD based off note number
 mapping (uint256 => depositNote) public cd;
+//mapping of address to CD note number 1 cd per address
 mapping (address => uint256) public cdTracker;
 
-
+//events within the protocol 
 event newCD (depositNote indexed);
 event earlyWithdrawlCD (depositNote indexed);
 event maturedCD (depositNote indexed);
@@ -106,9 +119,9 @@ event borrowCD (depositNote indexed);
 event payLoan (depositNote indexed);
 event liquidateCD (depositNote indexed, address indexed);
 event transferAddress(depositNote indexed, address indexed);
+event fundsAdd(depositNote indexed);
 
-//Deposit of Eth and ceation of CD note
-
+//Deposit of Eth and ceation of CD note , calculates all fees and interest rate for the life of cd 
 function depositEth(uint256 _days) payable public {
     require (cdTracker[msg.sender] == 0, "Already Have Valid CD Note Use Another Address");
     uint256 _fee = calcFee(msg.value,fee);
@@ -125,8 +138,7 @@ function depositEth(uint256 _days) payable public {
     contractEarn = contractEarn + _fee;
 } 
 
-//Withdrawl of Matured CD Note @ end of timeLock
-
+//function to withdrawl matured CD Note @ end of timeLock
 function withdrawlCD (uint256 _noteNumber ) payable public {
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].valid == true,  "Not a valid cd, loaned or cleared");
@@ -142,6 +154,7 @@ function withdrawlCD (uint256 _noteNumber ) payable public {
     cd[_noteNumber].maturedValue = 0;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
 }
+//function to withdrawl the balance in the cd and not take cd to maturity
 function earlyWithdrawl (uint256 _noteNumber) payable public {
     require(godSwitch == false, "protocol shutdown");
     uint256 cdMature = cd[_noteNumber].block + cd[_noteNumber].timeLock;
@@ -157,9 +170,11 @@ function earlyWithdrawl (uint256 _noteNumber) payable public {
     cd[_noteNumber].ethBalance = 0;
     cd[_noteNumber].maturedValue = 0;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
+    cd[_noteNumber].liquidated = true;
     emit earlyWithdrawlCD(cd[_noteNumber]);
     contractEarn = contractEarn + cd[_noteNumber].earlyBorrowWithdrawlFee;
 } 
+//funtion to borrow from the cd with the ability to repay and still have cd mature if paid in certain time period
 function borrowWithdrawl(uint256 _noteNumber, uint256 _value) payable public {
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].valid == true,  "Not a valid cd, loaned or cleared");
@@ -175,6 +190,7 @@ function borrowWithdrawl(uint256 _noteNumber, uint256 _value) payable public {
     emit borrowCD(cd[_noteNumber]);
     contractEarn = contractEarn + cd[_noteNumber].earlyBorrowWithdrawlFee;
 }
+//function ot pay back loan and revalidate cd
 function payLoanCD(uint256 _noteNumber)payable public{
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].valid == false, "CD has no loan");
@@ -187,6 +203,7 @@ function payLoanCD(uint256 _noteNumber)payable public{
     cd[_noteNumber].valid = true;
     emit payLoan(cd[_noteNumber]);
 }
+//function to liquidate invalid notes and overdue loans 
 function liquidCD(uint256 _noteNumber)public {
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].valid == false , "CD not loaned");
@@ -201,10 +218,12 @@ function liquidCD(uint256 _noteNumber)public {
     cd[_noteNumber].maturedValue = 0;
     contractEarn = contractEarn + (cd[_noteNumber].ethBalance - cd[_noteNumber].loanPay) ;
 }
+//fuction of fee calculation for protocol to earn for service
 function calcFee(uint256 _value, uint256 _fee) pure public returns(uint256){
     uint256 feeCalc = _value * _fee / 10000 ; 
     return(feeCalc);
 }
+//function of interest rate based of days locked and max rate
 function rateCalc(uint256 _days) view public returns(uint256){
     require(godSwitch == false, "protocol shutdown");
     require(timeLockMin <=_days, "Not enough days");
@@ -213,6 +232,8 @@ function rateCalc(uint256 _days) view public returns(uint256){
     uint256 calcRate = _days * slope;
     return(calcRate);
 }
+
+//transfer cd to another account
 function transferCD(uint256 _noteNumber, address _newAddress) public {
     require(godSwitch == false, "protocol shutdown");
     require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
@@ -223,4 +244,15 @@ function transferCD(uint256 _noteNumber, address _newAddress) public {
     cd[_noteNumber].accountAddress = _newAddress;
     cdTracker[_newAddress] = _noteNumber;
 }
+//can send more money to cd at any time during maturing stage but can not be removed early without fee and doesnt earn interst (Form of savings with timelock)
+function addFunds(uint256 _noteNumber)payable  public{
+    require(godSwitch == false, "protocol shutdown");
+    require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
+    require(cd[_noteNumber].loanBlockDue < block.number, "Block Time Limit is Expired");
+    require(cd[_noteNumber].valid == true,  "Not a valid cd, loaned or cleared");
+    cd[_noteNumber].ethBalance = cd[_noteNumber].ethBalance + msg.value;
+    cd[_noteNumber].maturedValue = cd[_noteNumber].maturedValue + msg.value; 
+    emit fundsAdd(cd[_noteNumber]);
+    
+    
 }
