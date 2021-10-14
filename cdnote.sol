@@ -99,13 +99,13 @@ struct depositNote   {
     uint256 fee; //CD Fee
     uint256 earlyBorrowWithdrawlFee; //Fee for early Withdraw
     uint256 block; //Deposit Block
-    uint256 timeLock; //Number of Blocks the Deposit is locked up;
+    uint256 timeLock; //Block that CD has matured and can be withdrawn without fee
     uint256 ethBalance; //Balance of Eth in CD
     uint256 maturedValue; //Earned total value after timelock
-    uint256 loanPay;
-    uint256 loanBlockDue;
+    uint256 loanPay; //ammount needed to pay off loan against cd
+    uint256 loanBlockDue; //block that loan needs to be paid before defaulting on CD
     bool valid; // Cd cleared, loaned, or expired on loan
-    bool liquidated;
+    bool liquidated; //Loan has defaulted and funds added to contract
 }
 
 //mapping of the created CD based off note number
@@ -133,7 +133,7 @@ function depositEth(uint256 _days) payable public {
     uint256 depositValue = msg.value - _fee;
     uint256 depositRate = rateCalc(_days);
     uint256 maturedValue = (((depositValue)*(depositRate))/10000) + depositValue;
-    uint256 depositTimelock = _days * blocksPerDay;
+    uint256 depositTimelock = _days * blocksPerDay + block.number;
     cd[noteNumber] = depositNote(noteNumber,msg.sender,depositRate,_fee,_earlyBorrowWithdrawlFee,block.number,depositTimelock,depositValue,maturedValue,0,0, true,false);
     cdTracker[msg.sender] = noteNumber;
     emit newCD (cd[noteNumber]);
@@ -148,8 +148,7 @@ function withdrawlCD (uint256 _noteNumber ) payable public {
     require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
     address _accountAddress = cd[_noteNumber].accountAddress;
     address payable _ethreceiver = payable(_accountAddress);
-    uint256 cdMature = cd[_noteNumber].block + cd[_noteNumber].timeLock;
-    require (cdMature <= block.number, "cd not matured");
+    require(cd[_noteNumber].timeLock <= block.number, "cd not matured");
     _ethreceiver.transfer(cd[_noteNumber].maturedValue);
     emit maturedCD(cd[_noteNumber]);
     cd[_noteNumber].valid = false;
@@ -160,8 +159,7 @@ function withdrawlCD (uint256 _noteNumber ) payable public {
 //function to withdrawl the balance in the cd and not take cd to maturity
 function earlyWithdrawl (uint256 _noteNumber) payable public {
     require(godSwitch == false, "protocol shutdown");
-    uint256 cdMature = cd[_noteNumber].block + cd[_noteNumber].timeLock;
-    require (cdMature >= block.number, "use withdrawl CD");
+    require(cd[_noteNumber].timeLock <= block.number, "cd not matured");
     require(cd[_noteNumber].valid == true, "Not a valid cd, loaned or cleared");
     require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
     address _accountAddress = cd[_noteNumber].accountAddress;
