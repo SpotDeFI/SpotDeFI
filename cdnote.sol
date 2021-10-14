@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity >=0.7.0 <0.9.0;
@@ -68,6 +67,9 @@ function changeTimeLockMax(uint256 _timeLockMax) onlyDAO public {
     timeLockMax = _timeLockMax;
 }
 //Changes Min Days of Time Lock
+function changeLoanTimeLimit(uint256 _loanTimeLimit) onlyDAO public {
+    loanTimeLimit = _loanTimeLimit;
+}
 function changeTimeLockMin(uint256 _timeLockMin) onlyDAO public {
     require(_timeLockMin < timeLockMax);
     timeLockMin = _timeLockMin;
