@@ -13,10 +13,10 @@ contract CDNote {
     timeLockMin = 2; // Days
     timeLockMax = 730; //Days
     loanTimeLimit = 2; //Days
-    rateMax = 2000; //Days 
+    rateMax = 2000; //% max to earn on initial investment 10,000 = 100%
     maxBorrow = 2; // borrow have CD
     earlyBorrowWithdrawlFee = 50; // 10,000 = 100%
-    minDeposit = 10000000000000; // 10,000 gwei min deposi
+    minDeposit = 10000000000000; // 10,000 gwei min deposit
 }
     address public DAO; //Dao contract address to make governance calls 
     address payable public contractAddress; // THIS addres
