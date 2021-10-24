@@ -159,7 +159,7 @@ function withdrawlCD (uint256 _noteNumber ) payable public {
 //function to withdrawl the balance in the cd and not take cd to maturity
 function earlyWithdrawl (uint256 _noteNumber) payable public {
     require(godSwitch == false, "protocol shutdown");
-    require(cd[_noteNumber].timeLock <= block.number, "cd not matured");
+    require(cd[_noteNumber].timeLock >= block.number, "cd matured");
     require(cd[_noteNumber].valid == true, "Not a valid cd, loaned or cleared");
     require(cd[_noteNumber].accountAddress==msg.sender, "Not Note Owner");
     address _accountAddress = cd[_noteNumber].accountAddress;
