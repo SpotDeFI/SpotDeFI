@@ -151,11 +151,12 @@ function withdrawlCD (uint256 _noteNumber ) payable public {
     require(cd[_noteNumber].timeLock <= block.number, "cd not matured");
     _ethreceiver.transfer(cd[_noteNumber].maturedValue);
     emit maturedCD(cd[_noteNumber]);
+    contractEarn = contractEarn - (cd[_noteNumber].maturedValue - cd[_noteNumber].ethBalance);
     cd[_noteNumber].valid = false;
     cd[_noteNumber].ethBalance = 0;
     cd[_noteNumber].maturedValue = 0;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
-    contractEarn = contractEarn - (cd[_noteNumber].maturedValue - cd[_noteNumber].ethBalance);
+    
 }
 //function to withdrawl the balance in the cd and not take cd to maturity
 function earlyWithdrawl (uint256 _noteNumber) payable public {
