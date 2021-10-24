@@ -155,6 +155,7 @@ function withdrawlCD (uint256 _noteNumber ) payable public {
     cd[_noteNumber].ethBalance = 0;
     cd[_noteNumber].maturedValue = 0;
     cdTracker[cd[_noteNumber].accountAddress] = 0;
+    contractEarn = contractEarn - (cd[_noteNumber].maturedValue - cd[_noteNumber].ethBalance);
 }
 //function to withdrawl the balance in the cd and not take cd to maturity
 function earlyWithdrawl (uint256 _noteNumber) payable public {
@@ -182,11 +183,11 @@ function borrowWithdrawl(uint256 _noteNumber, uint256 _value) payable public {
     require(cd[_noteNumber].accountAddress== msg.sender, "Not Note Owner");
     require((cd[_noteNumber].ethBalance - cd[_noteNumber].earlyBorrowWithdrawlFee )/ maxBorrow >= _value, "Over Borrow Limit");
     address _accountAddress = cd[_noteNumber].accountAddress;
-    address payable _ethreceiver = payable(_accountAddress);
+    address payable _ethReceiver = payable(_accountAddress);
     cd[_noteNumber].ethBalance = cd[_noteNumber].ethBalance - cd[_noteNumber].earlyBorrowWithdrawlFee - _value;
     cd[_noteNumber].loanBlockDue = block.number + (loanTimeLimit * blocksPerDay);
     cd[_noteNumber].loanPay = _value; 
-    _ethreceiver.transfer(_value);
+    _ethReceiver.transfer(_value);
     cd[_noteNumber].valid = false;
     emit borrowCD(cd[_noteNumber]);
     contractEarn = contractEarn + cd[_noteNumber].earlyBorrowWithdrawlFee;
@@ -255,7 +256,13 @@ function addFunds(uint256 _noteNumber)payable  public{
     cd[_noteNumber].ethBalance = cd[_noteNumber].ethBalance + msg.value;
     cd[_noteNumber].maturedValue = cd[_noteNumber].maturedValue + msg.value; 
     emit fundsAdd(cd[_noteNumber]);
-    
+}
+//ability to remove earned contract funds 
+function earnedFunds(address payable _ethReceiver ,uint256 _value)payable onlyDAO public {
+    require(godSwitch == false, "Protocol Shutdown");
+    require(_value <= contractEarn, "Contract has not earned enough funds");
+    _ethReceiver.transfer(_value);
     
 }
+    
 }
